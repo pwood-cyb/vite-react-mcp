@@ -11,13 +11,16 @@
     "strict": true,
     "strictNullChecks": false,
     "noImplicitAny": false,
+    "typeRoots": ["./node_modules/@types"],
+    "skipLibCheck": true,
     "outDir": "dist",
     "esModuleInterop": true
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
-    "src/**/*.js"
+    "src/**/*.js",
+    "src/**/*.d.ts"
   ],
   "exclude": [
     "**/dist/**",

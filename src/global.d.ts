@@ -18,4 +18,31 @@ declare global {
       }) => WastedRenderFiberInfo[];
     };
   }
+
+  /**
+   * Bun's global ImportMeta.hot typing expects a `decline()` method, while Vite's
+   * `ViteHotContext` does not declare it. We add it here to satisfy Bun's
+   * widened ImportMeta type when compiling with bun/tsc.
+   */
+  interface ImportMetaHot {
+    decline(): void;
+  }
+}
+
+declare module 'vite' {
+  interface ViteHotContext {
+    decline(): void;
+  }
+}
+
+declare module 'vite/types/hmr' {
+  interface ViteHotContext {
+    decline(): void;
+  }
+}
+
+declare module 'vite/runtime/client' {
+  interface ViteHotContext {
+    decline(): void;
+  }
 }

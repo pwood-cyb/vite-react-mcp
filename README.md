@@ -12,21 +12,15 @@ A Vite plugin that creates an MCP server to help LLMs understand your React App 
   - params: 
     - `componentName`: string
 
-  ![highlight-component](./playground/demo/demo_highlight_component.gif)
-
 - `get-component-states`
   - description: Get the React component props, states, and contexts in JSON structure format.
   - params:
     - `componentName`: string
 
-  ![get-component-states](./playground/demo/demo_get_states.gif)
-
 - `get-component-tree`
   - description: Get the React component tree of the current page in ASCII format.
   - params:
     - `allComponent`: boolean, if truthy, return a tree for all components instead of your self-defined components only.
-
-  ![get-component-tree](./playground/demo/demo_get_component_tree.gif)
 
 - `get-unnecessary-rerenders`
   - description: Get the wasted re-rendered components of the current page.
@@ -34,20 +28,12 @@ A Vite plugin that creates an MCP server to help LLMs understand your React App 
     - `timeframe`: number, if present, only get unnecessary renders within the last `timeframe` seconds. If not, get all unnecessary renders happened on the current page.
     - `allComponent`: boolean, if truthy, get unnecessary renders for all components instead of self-defined components only.
 
-  ![get-unnecessary-rerenders](./playground/demo/demo_unnecessary_renders.gif)
-
 ## Getting Started
 
 ### Installation
 
 ```bash
-pnpm install vite-react-mcp -D
-```
-
-You also need `@babel/preset-react` installed, as this plugins traverses AST to collect your React components names.
-
-```bash
-pnpm install @babel/preset-react
+bun add -d vite-react-mcp @babel/preset-react
 ```
 
 ### Usage
@@ -58,6 +44,7 @@ import ReactMCP from 'vite-react-mcp'
 
 export default defineConfig({
   plugins: [ReactMCP()],
+  server: { host: true, port: 3001 }, // pick the port you want
 })
 ```
 
@@ -77,11 +64,16 @@ To use it as an MCP server, setup MCP configuration in your MCP client.
   }
   ```
 
-  Make sure the port is the same as your react app
+  Make sure the port is the same as your react app.
 
 - For Claude Desktop, it requires a bit of workaround. If you are interested, you can take a look at [this thread](https://github.com/orgs/modelcontextprotocol/discussions/16).
 
   The reason is Claude MCP Client does execution based on command, while what we have here is HTTP based API. You need to write a script acting as a bridge to make it look like execution based.
+
+- Any MCP client can also discover the server via the manifest exposed at:
+  - `http://localhost:<port>/.well-known/vite-react-mcp.json`
+  - SSE endpoint: `http://localhost:<port>/sse`
+  - Message endpoint: `http://localhost:<port>/messages`
 
 
 ### How it works
@@ -90,14 +82,6 @@ MCP exposes a tool-call api through natural language. The tool itself is injecte
 It works without requiring React Devtools extension, as we use `bippy`, which injects a `__REACT_GLOBAL_DEVTOOLS_HOOK__`
 to `window`. The tool then is triggered from vite's websocket call to do corresponding actions by receiving mcp tool call 
 command from the mcp client you interact.
-
-### Test
-
-```bash
-pnpm run playground
-```
-
-The playground contains a simple user profile application to test React component interactions.
 
 ## Acknowledgement
 

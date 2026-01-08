@@ -148,12 +148,17 @@ function ReactMCP(): Plugin {
 
     configureServer(viteDevServer: ViteDevServer) {
       const mcpServer = initMcpServer(viteDevServer);
-      instrumentViteDevServer(viteDevServer, mcpServer);
+      const mcpMetadata = instrumentViteDevServer(viteDevServer, mcpServer);
       setTimeout(() => {
-        console.info(
-          'Vite React MCP server is running on port',
-          viteDevServer.config.server.port,
-        );
+        const announcedEndpoints =
+          mcpMetadata?.endpoints?.sse?.local ??
+          mcpMetadata?.endpoints?.sse?.network ??
+          [];
+        const endpointText =
+          announcedEndpoints.length > 0
+            ? announcedEndpoints.join(', ')
+            : `http://localhost:${viteDevServer.config.server.port ?? 5173}/sse`;
+        console.info('Vite React MCP server (SSE):', endpointText);
       }, 1000);
     },
 
@@ -175,7 +180,7 @@ function ReactMCP(): Plugin {
     },
 
     transform(code, id) {
-      transformBabelCollectName(code, id);
+      return transformBabelCollectName(code, id);
     },
 
     transformIndexHtml() {

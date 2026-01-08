@@ -54,13 +54,16 @@ bippy.instrument({
 });
 
 const setupMcpToolsHandler = () => {
-  if (import.meta.hot) {
-    import.meta.hot.on('highlight-component', (data) => {
-      let deserializedData;
+  const hot = import.meta.hot as any;
+  if (hot) {
+    hot.on('highlight-component', (data: string) => {
+      let deserializedData: { componentName?: string };
       try {
         deserializedData = JSON.parse(data);
-      } catch (_error) {
-        throw new Error(`Data is not deserializable: ${data}`);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Data is not deserializable';
+        throw new Error(`${message}: ${data}`);
       }
       if (typeof deserializedData?.componentName !== 'string') {
         throw new Error('Invalid args sent from ViteDevServer');
@@ -74,36 +77,41 @@ const setupMcpToolsHandler = () => {
         if (components.length > 0) {
           response = `Found and highlighted ${components.length} components`;
         }
-      } catch (_error) {
-        response = `Error: ${_error.message}`;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        response = `Error: ${message}`;
       }
 
-      import.meta.hot.send('highlight-component-response', response);
+      hot.send('highlight-component-response', response);
     });
 
-    import.meta.hot.on('get-component-tree', (data) => {
-      let deserializedData;
+    hot.on('get-component-tree', (data: string) => {
+      let deserializedData: Record<string, unknown>;
       try {
         deserializedData = JSON.parse(data);
-      } catch (_error) {
-        throw new Error(`Args is not deserializable: ${data}`);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Args is not deserializable';
+        throw new Error(`${message}: ${data}`);
       }
 
       const componentTreeRoot =
         target.__VITE_REACT_MCP_TOOLS__.getComponentTree(deserializedData);
       console.log('get-component-tree-response', componentTreeRoot);
-        import.meta.hot.send(
+        hot.send(
         'get-component-tree-response',
         JSON.stringify(componentTreeRoot),
       );
     });
 
-    import.meta.hot.on('get-component-states', (data) => {
-      let deserializedData;
+    hot.on('get-component-states', (data: string) => {
+      let deserializedData: { componentName?: string };
       try {
         deserializedData = JSON.parse(data);
-      } catch (_error) {
-        throw new Error(`Data is not deserializable: ${data}`);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Data is not deserializable';
+        throw new Error(`${message}: ${data}`);
       }
       if (typeof deserializedData?.componentName !== 'string') {
         console.debug('get-component-states ws handler', deserializedData);
@@ -116,18 +124,20 @@ const setupMcpToolsHandler = () => {
         target.__VITE_REACT_MCP_TOOLS__.getComponentStates(
           deserializedData.componentName,
         );
-      import.meta.hot.send(
+      hot.send(
         'get-component-states-response',
         JSON.stringify(componentStatesResult),
       );
     });
 
-    import.meta.hot.on('get-unnecessary-rerenders', (data) => {
-      let deserializedData;
+    hot.on('get-unnecessary-rerenders', (data: string) => {
+      let deserializedData: { timeframe?: number; allComponents?: boolean; debugMode?: boolean };
       try {
         deserializedData = JSON.parse(data);
-      } catch (_error) {
-        throw new Error(`Data is not deserializable: ${data}`);
+      } catch (error: unknown) {
+        const message =
+          error instanceof Error ? error.message : 'Data is not deserializable';
+        throw new Error(`${message}: ${data}`);
       }
 
       const wastedRenders =
@@ -143,12 +153,13 @@ const setupMcpToolsHandler = () => {
 
       try {
         response = JSON.stringify(wastedRenders);
-      } catch (_error) {
-        console.error('Error serializing wasted renders', _error);
-        response = JSON.stringify({ error: _error.message });
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error('Error serializing wasted renders', error);
+        response = JSON.stringify({ error: message });
       }
 
-      import.meta.hot.send('get-unnecessary-rerenders-response', response);
+      hot.send('get-unnecessary-rerenders-response', response);
     });
   }
 };

@@ -16,6 +16,80 @@ import {
   HighlightComponentSchema,
 } from './schema.js';
 
+const DEFAULT_VITE_PORT = 5173;
+
+type McpServerEndpoints = {
+  sse: {
+    local: string[];
+    network: string[];
+  };
+  messages: {
+    local: string[];
+    network: string[];
+  };
+};
+
+type McpServerMetadata = {
+  endpoints: McpServerEndpoints;
+};
+
+function buildEndpointUrls(origins: string[], pathname: string) {
+  const normalizedPath = pathname.startsWith('/') ? pathname.slice(1) : pathname;
+  return origins.map((origin) => new URL(normalizedPath, origin).toString());
+}
+
+function getFallbackOrigin(viteDevServer: ViteDevServer) {
+  const isHttps = Boolean(viteDevServer.config.server?.https);
+  const protocol = isHttps ? 'https' : 'http';
+  const addressInfo = viteDevServer.httpServer?.address();
+
+  if (addressInfo && typeof addressInfo === 'object' && addressInfo.port) {
+    const host =
+      addressInfo.address === '::' || addressInfo.address === '0.0.0.0'
+        ? 'localhost'
+        : addressInfo.address;
+    return `${protocol}://${host}:${addressInfo.port}`;
+  }
+
+  const hostConfig = viteDevServer.config.server?.host;
+  const host =
+    typeof hostConfig === 'string' && hostConfig !== '0.0.0.0'
+      ? hostConfig
+      : 'localhost';
+  const port = viteDevServer.config.server?.port ?? DEFAULT_VITE_PORT;
+
+  return `${protocol}://${host}:${port}`;
+}
+
+function resolveOrigins(viteDevServer: ViteDevServer, type: 'local' | 'network') {
+  const resolved = viteDevServer.resolvedUrls?.[type];
+  if (resolved && resolved.length > 0) {
+    return resolved;
+  }
+
+  if (type === 'local') {
+    return [getFallbackOrigin(viteDevServer)];
+  }
+
+  return [];
+}
+
+function getMcpServerEndpoints(viteDevServer: ViteDevServer): McpServerEndpoints {
+  const localOrigins = resolveOrigins(viteDevServer, 'local');
+  const networkOrigins = resolveOrigins(viteDevServer, 'network');
+
+  return {
+    sse: {
+      local: buildEndpointUrls(localOrigins, '/sse'),
+      network: buildEndpointUrls(networkOrigins, '/sse'),
+    },
+    messages: {
+      local: buildEndpointUrls(localOrigins, '/messages'),
+      network: buildEndpointUrls(networkOrigins, '/messages'),
+    },
+  };
+}
+
 export function initMcpServer(viteDevServer: ViteDevServer): Server {
   const server = new Server(
     {
@@ -156,10 +230,31 @@ export function initMcpServer(viteDevServer: ViteDevServer): Server {
 export function instrumentViteDevServer(
   viteDevServer: ViteDevServer,
   mcpServer: Server,
-) {
+): McpServerMetadata {
   const transports = new Map<string, SSEServerTransport>();
+  const endpoints = getMcpServerEndpoints(viteDevServer);
+
+  viteDevServer.middlewares.use(
+    '/.well-known/vite-react-mcp.json',
+    async (_req, res) => {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Cache-Control', 'no-cache, max-age=0');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.end(
+        JSON.stringify({
+          name: 'vite-react-mcp',
+          version: getVersionString(),
+          transport: 'sse',
+          endpoints,
+        }),
+      );
+    },
+  );
 
   viteDevServer.middlewares.use('/sse', async (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     const transport = new SSEServerTransport('/messages', res);
     transports.set(transport.sessionId, transport);
     res.on('close', () => {
@@ -169,6 +264,15 @@ export function instrumentViteDevServer(
   });
 
   viteDevServer.middlewares.use('/messages', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'content-type');
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      return;
+    }
+
     if (req.method !== 'POST') {
       res.statusCode = 405;
       res.end('Method Not Allowed');
@@ -193,4 +297,8 @@ export function instrumentViteDevServer(
 
     await transport.handlePostMessage(req, res);
   });
+
+  return {
+    endpoints,
+  };
 }
